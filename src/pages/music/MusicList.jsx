@@ -1,0 +1,359 @@
+import { useState, useEffect } from 'react'
+import { 
+  Search, 
+  Plus, 
+  Download, 
+  Trash2, 
+  Edit, 
+  Filter,
+  Music,
+  Volume2,
+  Heart,
+  Headphones,
+  Clock,
+  X,
+  Eye,
+  Upload,
+  User,
+  Tag,
+  Calendar,
+  FileAudio,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  Image as ImageIcon
+} from 'lucide-react'
+import { getMusic, getMusicById, uploadMusic, updateMusic, deleteMusic } from '../../api/api'
+import AddMusic from './AddMusic'
+
+// AddMusic Component
+
+// Main MusicList Component
+const MusicList = () => {
+  const [musicList, setMusicList] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filteredMusic, setFilteredMusic] = useState([])
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingMusic, setEditingMusic] = useState(null)
+  const [selectedTracks, setSelectedTracks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    fetchMusicList()
+  }, [])
+
+  const fetchMusicList = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await getMusic()
+      
+      // Handle different response structures
+      let music = []
+      if (Array.isArray(response)) {
+        music = response
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        music = response.data.data
+      } else if (response.data && Array.isArray(response.data)) {
+        music = response.data
+      } else if (response.music && Array.isArray(response.music)) {
+        music = response.music
+      }
+      
+      setMusicList(music)
+      setFilteredMusic(music)
+    } catch (err) {
+      console.error('Error fetching music:', err)
+      setError(err.response?.data?.message || err.message || 'Failed to load music')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const filtered = musicList.filter(music =>
+      music.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      music.artists?.some(artist => artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      music.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    setFilteredMusic(filtered)
+  }, [searchTerm, musicList])
+
+  const handleEdit = (music) => {
+    setEditingMusic(music)
+    setIsAddModalOpen(true)
+  }
+
+  const handleDelete = async (musicId) => {
+    if (!window.confirm('Are you sure you want to delete this track?')) {
+      return
+    }
+
+    try {
+      await deleteMusic(musicId)
+      await fetchMusicList()
+    } catch (err) {
+      console.error('Error deleting music:', err)
+      alert(err.message || 'Failed to delete music')
+    }
+  }
+
+  const handleAddOrUpdateMusic = async () => {
+    await fetchMusicList()
+  }
+
+  const toggleTrackSelection = (trackId) => {
+    setSelectedTracks(prev => 
+      prev.includes(trackId) 
+        ? prev.filter(id => id !== trackId)
+        : [...prev, trackId]
+    )
+  }
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  return (
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen">
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-8 text-white">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-6 lg:mb-0">
+              <h1 className="text-4xl font-bold mb-2">Music Library</h1>
+              <p className="text-white/80 text-lg">Manage and discover your audio collection</p>
+              <div className="flex items-center gap-6 mt-4">
+                <div className="flex items-center gap-2">
+                  <Music className="h-5 w-5" />
+                  <span className="font-semibold">{musicList.length} Tracks</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Export Playlist
+              </button>
+              <button 
+                onClick={() => {
+                  setEditingMusic(null)
+                  setIsAddModalOpen(true)
+                }}
+                className="bg-white text-purple-600 hover:bg-white/90 font-semibold px-6 py-2 rounded-xl transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Music
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-red-900 mb-1">Error Loading Data</h4>
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={fetchMusicList}
+                className="mt-2 text-sm font-medium text-red-600 hover:text-red-700 underline"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-12 w-12 text-purple-600 animate-spin mb-4" />
+            <p className="text-gray-600 font-medium">Loading music library...</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search tracks, artists..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {selectedTracks.length > 0 && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-blue-900">
+                    {selectedTracks.length} track(s) selected
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-1">
+                      <Download className="h-3 w-3" />
+                      Download
+                    </button>
+                    <button className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1">
+                      <Trash2 className="h-3 w-3" />
+                      Delete Selected
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-xl border border-gray-200">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredMusic.map((music) => (
+                      <tr key={music._id || music.id} className="hover:bg-gray-50 transition-colors duration-200 group">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
+                            checked={selectedTracks.includes(music._id || music.id)}
+                            onChange={() => toggleTrackSelection(music._id || music.id)}
+                          />
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-4">
+                            <div className="relative">
+                              {music.image ? (
+                                <img 
+                                  src={music.image} 
+                                  alt={music.title}
+                                  className="h-12 w-12 rounded-xl object-cover shadow-lg"
+                                />
+                              ) : (
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                                  <span className="text-lg font-bold text-white">
+                                    {music.title?.charAt(0) || 'M'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-900">{music.title}</h3>
+                              <p className="text-xs text-gray-400">Album: {music.albumId}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {music.artists && music.artists.length > 0 ? (
+                              music.artists.map((artist, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800"
+                                >
+                                  {artist}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-sm text-gray-500">No artists</span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-600 max-w-xs truncate">
+                            {music.description || 'No description'}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button 
+                              onClick={() => handleEdit(music)}
+                              className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(music._id || music.id)}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {filteredMusic.length === 0 && !loading && (
+              <div className="text-center py-12">
+                <Music className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No tracks found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchTerm ? 'Try adjusting your search criteria.' : 'Get started by adding your first track.'}
+                </p>
+                <button 
+                  onClick={() => {
+                    setEditingMusic(null)
+                    setIsAddModalOpen(true)
+                  }}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add New Track
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <AddMusic 
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false)
+          setEditingMusic(null)
+        }}
+        onAddMusic={handleAddOrUpdateMusic}
+        editingMusic={editingMusic}
+      />
+    </div>
+  )
+}
+
+export default MusicList;
+                     
