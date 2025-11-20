@@ -17,6 +17,7 @@ import {
   Disc3
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import logo from '../../assets/logo.jpeg';
 
 const navigation = [
   { 
@@ -96,15 +97,15 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div className="flex items-center gap-x-3">
           <div className="relative">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Music2 className="h-5 w-5 text-white" />
+  <img src={logo} alt="Logo" className=""/>
             </div>
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center animate-pulse">
-              <Volume2 className="h-2 w-2 text-white" />
+             
             </div>
           </div>
           <div>
             <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-             Sama Music 
+             Sama Song 
             </span>
             <div className="text-xs text-gray-400 font-medium">Studio Pro</div>
           </div>
