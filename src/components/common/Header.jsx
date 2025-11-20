@@ -1,4 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import { 
   Menu, 
   Bell, 
@@ -15,10 +16,12 @@ import Button from '../ui/Button'
 
 const Header = ({ onMenuClick }) => {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
 
   const handleLogout = () => {
     dispatch(logout())
+    navigate('/login')
   }
 
   return (
@@ -32,24 +35,6 @@ const Header = ({ onMenuClick }) => {
         >
           <Menu className="h-6 w-6" />
         </button>
-
-        {/* Brand section */}
-        {/* <div className="flex items-center gap-x-3">
-          <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Music className="h-5 w-5 text-white" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center">
-              <Volume2 className="h-2 w-2 text-white" />
-            </div>
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
-              Music Admin
-            </h1>
-            <p className="text-xs text-gray-500 font-medium">Studio Dashboard</p>
-          </div>
-        </div> */}
 
         {/* Search bar - hidden on mobile */}
         <div className="hidden md:flex flex-1 max-w-md mx-8">
@@ -77,18 +62,6 @@ const Header = ({ onMenuClick }) => {
               <span className="text-xs font-semibold text-gray-700">247</span>
             </div>
           </div>
-
-          {/* Notifications */}
-          {/* <div className="relative">
-            <button className="p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200 relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                3
-              </span>
-            </button>
-          </div> */}
-
-         
 
           {/* User profile */}
           <div className="flex items-center gap-x-3 pl-3 border-l border-gray-200">

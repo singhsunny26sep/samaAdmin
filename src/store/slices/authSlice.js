@@ -1,24 +1,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import { loginUser, logoutUser } from '../../api/api'
+import { loginUser } from '../../api/api'
 
 // Async thunks
 export const login = createAsyncThunk(
   'auth/login',
   async ({ email, password, role = 'admin' }, { rejectWithValue }) => {
     try {
-      // loginUser already returns response.data due to interceptor
       const response = await loginUser({ 
-        type: 'email',     // Required by API
-        email,             // Required by API
-        password,          // Required by API
-        role,              // Required by API (defaults to 'admin')
-        fcmToken: ''       // Required by API (empty string if not using push notifications)
+        type: 'email',
+        email,
+        password,
+        role,
+        fcmToken: ''
       })
-      
-      // response is already the data object because of axios interceptor
       return response
     } catch (error) {
-      // Better error handling
       const errorMessage = 
         error.response?.data?.message || 
         error.response?.data?.error ||
@@ -29,9 +25,14 @@ export const login = createAsyncThunk(
   }
 )
 
-export const logout = createAsyncThunk('auth/logout', async () => {
-  await logoutUser()
-})
+// Simple synchronous logout - no API call needed
+export const logout = createAsyncThunk(
+  'auth/logout',
+  async () => {
+    // Just return success - all cleanup happens in the reducer
+    return true
+  }
+)
 
 const authSlice = createSlice({
   name: 'auth',
@@ -50,7 +51,6 @@ const authSlice = createSlice({
       state.user = action.payload.user
       state.token = action.payload.token
       state.isAuthenticated = true
-      // Save to localStorage
       localStorage.setItem('token', action.payload.token)
       localStorage.setItem('user', JSON.stringify(action.payload.user))
     },
@@ -58,7 +58,6 @@ const authSlice = createSlice({
       state.user = null
       state.token = null
       state.isAuthenticated = false
-      // Clear from localStorage
       localStorage.removeItem('token')
       localStorage.removeItem('user')
     },
@@ -71,8 +70,6 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
-        // Adjust based on your API response structure
-        // If API returns { success: true, data: { user, token } }
         const user = action.payload.data?.user || action.payload.user
         const token = action.payload.data?.token || action.payload.token
         
@@ -81,7 +78,6 @@ const authSlice = createSlice({
         state.isAuthenticated = true
         state.error = null
         
-        // Save to localStorage
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
       })
@@ -91,7 +87,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false
         state.user = null
         state.token = null
-        // Clear from localStorage on login failure
         localStorage.removeItem('token')
         localStorage.removeItem('user')
       })
@@ -100,7 +95,7 @@ const authSlice = createSlice({
         state.token = null
         state.isAuthenticated = false
         state.error = null
-        // Clear from localStorage
+        state.isLoading = false
         localStorage.removeItem('token')
         localStorage.removeItem('user')
       })

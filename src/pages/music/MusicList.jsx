@@ -5,30 +5,14 @@ import {
   Download, 
   Trash2, 
   Edit, 
-  Filter,
   Music,
-  Volume2,
-  Heart,
-  Headphones,
-  Clock,
   X,
-  Eye,
-  Upload,
-  User,
-  Tag,
-  Calendar,
-  FileAudio,
-  Sparkles,
   Loader2,
-  AlertCircle,
-  Image as ImageIcon
+  AlertCircle
 } from 'lucide-react'
-import { getMusic, getMusicById, uploadMusic, updateMusic, deleteMusic } from '../../api/api'
+import { getMusic, deleteMusic } from '../../api/api'
 import AddMusic from './AddMusic'
 
-// AddMusic Component
-
-// Main MusicList Component
 const MusicList = () => {
   const [musicList, setMusicList] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -72,11 +56,15 @@ const MusicList = () => {
   }
 
   useEffect(() => {
-    const filtered = musicList.filter(music =>
-      music.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      music.artists?.some(artist => artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      music.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filtered = musicList.filter(music => {
+      const searchLower = searchTerm.toLowerCase()
+      return (
+        music.name?.toLowerCase().includes(searchLower) ||
+        music.title?.toLowerCase().includes(searchLower) ||
+        music.description?.toLowerCase().includes(searchLower) ||
+        music.artists?.some(artist => artist.toLowerCase().includes(searchLower))
+      )
+    })
     setFilteredMusic(filtered)
   }, [searchTerm, musicList])
 
@@ -111,11 +99,19 @@ const MusicList = () => {
     )
   }
 
-  const formatDuration = (seconds) => {
-    if (!seconds) return '0:00'
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedTracks.length} track(s)?`)) {
+      return
+    }
+
+    try {
+      await Promise.all(selectedTracks.map(id => deleteMusic(id)))
+      setSelectedTracks([])
+      await fetchMusicList()
+    } catch (err) {
+      console.error('Error deleting tracks:', err)
+      alert(err.message || 'Failed to delete some tracks')
+    }
   }
 
   return (
@@ -131,6 +127,11 @@ const MusicList = () => {
                 <div className="flex items-center gap-2">
                   <Music className="h-5 w-5" />
                   <span className="font-semibold">{musicList.length} Tracks</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">
+                    {musicList.filter(m => m.isActive).length} Active
+                  </span>
                 </div>
               </div>
             </div>
@@ -187,7 +188,7 @@ const MusicList = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search tracks, artists..."
+                  placeholder="Search tracks, albums, descriptions..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-10 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
@@ -214,7 +215,10 @@ const MusicList = () => {
                       <Download className="h-3 w-3" />
                       Download
                     </button>
-                    <button className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1">
+                    <button 
+                      onClick={handleBulkDelete}
+                      className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1"
+                    >
                       <Trash2 className="h-3 w-3" />
                       Delete Selected
                     </button>
@@ -228,8 +232,31 @@ const MusicList = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
+                      <th className="px-6 py-4 text-left">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
+                          checked={selectedTracks.length === filteredMusic.length && filteredMusic.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTracks(filteredMusic.map(m => m._id))
+                            } else {
+                              setSelectedTracks([])
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Track
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Category
+                      </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Description
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Status
                       </th>
                       <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
@@ -238,13 +265,13 @@ const MusicList = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredMusic.map((music) => (
-                      <tr key={music._id || music.id} className="hover:bg-gray-50 transition-colors duration-200 group">
+                      <tr key={music._id} className="hover:bg-gray-50 transition-colors duration-200 group">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input
                             type="checkbox"
                             className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
-                            checked={selectedTracks.includes(music._id || music.id)}
-                            onChange={() => toggleTrackSelection(music._id || music.id)}
+                            checked={selectedTracks.includes(music._id)}
+                            onChange={() => toggleTrackSelection(music._id)}
                           />
                         </td>
                         
@@ -254,40 +281,33 @@ const MusicList = () => {
                               {music.image ? (
                                 <img 
                                   src={music.image} 
-                                  alt={music.title}
+                                  alt={music.name || music.title}
                                   className="h-12 w-12 rounded-xl object-cover shadow-lg"
                                 />
                               ) : (
                                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
                                   <span className="text-lg font-bold text-white">
-                                    {music.title?.charAt(0) || 'M'}
+                                    {(music.name || music.title)?.charAt(0) || 'M'}
                                   </span>
                                 </div>
                               )}
                             </div>
                             
                             <div>
-                              <h3 className="text-sm font-semibold text-gray-900">{music.title}</h3>
-                              <p className="text-xs text-gray-400">Album: {music.albumId}</p>
+                              <h3 className="text-sm font-semibold text-gray-900">
+                                {music.name || music.title}
+                              </h3>
+                              <p className="text-xs text-gray-400">
+                                {new Date(music.createdAt).toLocaleDateString()}
+                              </p>
                             </div>
                           </div>
                         </td>
 
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {music.artists && music.artists.length > 0 ? (
-                              music.artists.map((artist, idx) => (
-                                <span 
-                                  key={idx}
-                                  className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800"
-                                >
-                                  {artist}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-sm text-gray-500">No artists</span>
-                            )}
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                            {music.categoryId?.substring(0, 8) || 'No Category'}
+                          </span>
                         </td>
 
                         <td className="px-6 py-4">
@@ -296,17 +316,29 @@ const MusicList = () => {
                           </p>
                         </td>
 
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            music.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {music.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button 
                               onClick={() => handleEdit(music)}
                               className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                              title="Edit"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
                             <button 
-                              onClick={() => handleDelete(music._id || music.id)}
+                              onClick={() => handleDelete(music._id)}
                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -355,5 +387,4 @@ const MusicList = () => {
   )
 }
 
-export default MusicList;
-                     
+export default MusicList

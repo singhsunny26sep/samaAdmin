@@ -33,8 +33,8 @@ export const ENDPOINTS = {
   },
 
   MUSIC: {
-    LIST: '/music',
-    UPLOAD: '/music/upload',
+    LIST: '/musics/getAll',
+    UPLOAD: '/musics/add',
     UPDATE: '/music',
     DELETE: '/music',
     SEARCH: '/music/search',

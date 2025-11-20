@@ -229,7 +229,7 @@ const fetchSubscriptionPlans = async () => {
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
                   <span className="font-semibold">
-                    ${getTotalRevenue().toLocaleString()}/year
+                    ₹{getTotalRevenue().toLocaleString()}/year
                   </span>
                 </div>
               </div>
@@ -427,7 +427,7 @@ const fetchSubscriptionPlans = async () => {
                     <div className="mb-4">
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-bold text-gray-900">
-                          ${plan.price}
+                          ₹{plan.price}
                         </span>
                         <span className="text-gray-500">/{plan.type === 'monthly' ? 'mo' : 'yr'}</span>
                       </div>
