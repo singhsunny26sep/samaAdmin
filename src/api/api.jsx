@@ -92,14 +92,17 @@ export const uploadMusic = async (formData) => {
   })
 }
 
+// FIXED: Update music endpoint
 export const updateMusic = async (id, musicData) => {
-  return await api.put(`${ENDPOINTS.MUSIC.UPDATE}/${id}`, musicData)
+  return await api.put(`/musics/${id}/update`, musicData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
+// FIXED: Delete music endpoint
 export const deleteMusic = async (id) => {
-  return await api.delete(`${ENDPOINTS.MUSIC.DELETE}/${id}`)
+  return await api.delete(`/musics/${id}/delete`)
 }
-
 // ==================== CATEGORY APIs ====================
 export const getCategories = async (params) => {
   return await api.get(ENDPOINTS.CATEGORIES.LIST, { params })
@@ -142,7 +145,9 @@ export const getSubcategoriesByCategory = async (categoryId) => {
 }
 
 export const createSubcategory = async (categoryId, subcategoryData) => {
-  return await api.post(`/subCategories/${categoryId}/create`, subcategoryData)
+  return await api.post(`/subCategories/${categoryId}/create`, subcategoryData,  {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export const updateSubcategory = async (categoryId, subcategoryId, subcategoryData) => {

@@ -35,8 +35,8 @@ export const ENDPOINTS = {
   MUSIC: {
     LIST: '/musics/getAll',
     UPLOAD: '/musics/add',
-    UPDATE: '/music',
-    DELETE: '/music',
+    UPDATE: '/musics',
+    DELETE: '/musics',
     SEARCH: '/music/search',
   },
   DASHBOARD: {
@@ -60,8 +60,8 @@ export const ENDPOINTS = {
   ALBUMS: {
     LIST: '/albums/getAll',           // GET - Get all albums
     CREATE: '/albums/create',          // POST - Create new album
-    UPDATE: '/albums',          // PUT - Update album by ID
-    DELETE: '/albums',          // DELETE - Delete album by ID
+    UPDATE: '/albums/update',          // PUT - Update album by ID
+    DELETE: '/albums/delete',          // DELETE - Delete album by ID
     BY_ID: '/albums',          // GET - Get single album
   },
 }

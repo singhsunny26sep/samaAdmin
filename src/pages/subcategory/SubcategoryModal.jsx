@@ -14,6 +14,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
     categoryId: ''
   })
   const [imagePreview, setImagePreview] = useState('')
+  const [imageFile, setImageFile] = useState(null) // Store actual file
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
@@ -24,6 +25,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
         categoryId: subcategory.categoryId || selectedCategory || ''
       })
       setImagePreview(subcategory.image || '')
+      setImageFile(null) // Clear file when editing
     } else {
       setFormData({
         name: '',
@@ -31,6 +33,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
         categoryId: selectedCategory || ''
       })
       setImagePreview('')
+      setImageFile(null)
     }
   }, [subcategory, isOpen, selectedCategory])
 
@@ -50,11 +53,14 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
 
     setUploading(true)
 
+    // Store the actual file
+    setImageFile(file)
+
+    // Create preview
     const reader = new FileReader()
     
     reader.onloadend = () => {
-      const base64String = reader.result
-      setImagePreview(base64String)
+      setImagePreview(reader.result)
       setUploading(false)
     }
 
@@ -90,12 +96,18 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
       return
     }
     
-    if (!imagePreview) {
+    // For new subcategory, require file
+    if (!subcategory && !imageFile) {
       alert('Please upload an image')
       return
     }
     
-    onSave({ ...formData, image: imagePreview })
+    // Pass the file object, not base64
+    onSave({ 
+      ...formData, 
+      imageFile: imageFile, // Pass actual file
+      image: imagePreview // Keep preview for display
+    })
   }
 
   if (!isOpen) return null
@@ -181,7 +193,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subcategory Image *
+                Subcategory Image {!subcategory && '*'}
               </label>
               
               <div className='flex flex-col items-center gap-4'>
@@ -227,7 +239,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || uploading || !imagePreview || !formData.name.trim() || !formData.description.trim() || !formData.categoryId}
+              disabled={loading || uploading || !formData.name.trim() || !formData.description.trim() || !formData.categoryId || (!subcategory && !imageFile)}
               className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Saving...' : subcategory ? 'Update' : 'Add'}
