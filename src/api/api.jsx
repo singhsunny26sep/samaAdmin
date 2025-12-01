@@ -110,11 +110,15 @@ export const getCategoryById = async (id) => {
 }
 
 export const createCategory = async (categoryData) => {
-  return await api.post(ENDPOINTS.CATEGORIES.CREATE, categoryData)
+  return await api.post(ENDPOINTS.CATEGORIES.CREATE, categoryData,  {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export const updateCategory = async (id, categoryData) => {
-  return await api.put(`${ENDPOINTS.CATEGORIES.UPDATE}/${id}`, categoryData)
+  return await api.put(`${ENDPOINTS.CATEGORIES.UPDATE}/${id}`, categoryData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export const deleteCategory = async (id) => {

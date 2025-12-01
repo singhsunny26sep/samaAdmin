@@ -91,29 +91,29 @@ const ManageCategories = () => {
     setIsModalOpen(true)
   }
 
+  // FIXED: Now accepts FormData directly from the modal
   const handleSaveCategory = async (formData) => {
     try {
       setActionLoading(true)
       
-      // Only send name, description, and image to the API
-      const categoryData = {
-        name: formData.name,
-        description: formData.description,
-        image: formData.image
-      }
-
+      // formData is already a FormData object with name, description, and image
+      // Just pass it directly to the API
+      
       if (editingCategory) {
         // Update existing category
-        await updateCategory(editingCategory._id || editingCategory.id, categoryData)
+        const response = await updateCategory(editingCategory._id || editingCategory.id, formData)
+        const updatedCategory = response.data || response
+        
         setCategories(prev => prev.map(cat =>
           (cat._id || cat.id) === (editingCategory._id || editingCategory.id) 
-            ? { ...cat, ...formData } 
+            ? { ...cat, ...updatedCategory } 
             : cat
         ))
       } else {
         // Create new category
-        const response = await createCategory(categoryData)
+        const response = await createCategory(formData)
         const newCategory = response.data || response
+        
         if (newCategory.image) {
           setCategories(prev => [...prev, newCategory])
         }
@@ -121,6 +121,10 @@ const ManageCategories = () => {
 
       setIsModalOpen(false)
       setEditingCategory(null)
+      
+      // Refresh categories to get the latest data
+      await fetchCategories()
+      
     } catch (err) {
       console.error('Error saving category:', err)
       alert(err.response?.data?.message || 'Failed to save category')
@@ -150,13 +154,14 @@ const ManageCategories = () => {
     try {
       setActionLoading(true)
       const category = categories.find(cat => (cat._id || cat.id) === id)
-      const updatedData = {
-        name: category.name,
-        description: category.description,
-        image: category.image
-      }
       
-      await updateCategory(id, updatedData)
+      // Create FormData for the update
+      const formData = new FormData()
+      formData.append('name', category.name)
+      formData.append('description', category.description)
+      formData.append('isActive', !category.isActive)
+      
+      await updateCategory(id, formData)
       setCategories(prev => prev.map(cat =>
         (cat._id || cat.id) === id ? { ...cat, isActive: !cat.isActive } : cat
       ))
@@ -204,7 +209,7 @@ const ManageCategories = () => {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="mb-6 lg:mb-0">
               <h1 className="text-4xl font-bold mb-2">Manage Categories</h1>
-              <p className="text-white/80 text-lg">Organize your  music library</p>
+              <p className="text-white/80 text-lg">Organize your music library</p>
               <div className="flex items-center gap-6 mt-4">
                 <div className="flex items-center gap-2">
                   <Tag className="h-5 w-5" />
@@ -433,16 +438,6 @@ const ManageCategories = () => {
         type="Category"
         loading={actionLoading}
       />
-
-      {/* Loading Overlay */}
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl flex items-center gap-4">
-            <Loader2 className="h-6 w-6 text-purple-600 animate-spin" />
-            <span className="font-semibold text-gray-900">Processing...</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

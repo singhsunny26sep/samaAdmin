@@ -6,6 +6,7 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
     name: '',
     description: ''
   })
+  const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
   const [uploading, setUploading] = useState(false)
 
@@ -16,12 +17,14 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
         description: category.description || ''
       })
       setImagePreview(category.image || '')
+      setImageFile(null)
     } else {
       setFormData({
         name: '',
         description: ''
       })
       setImagePreview('')
+      setImageFile(null)
     }
   }, [category, isOpen])
 
@@ -41,11 +44,14 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
 
     setUploading(true)
 
+    // Store the actual file for form submission
+    setImageFile(file)
+
+    // Create preview
     const reader = new FileReader()
     
     reader.onloadend = () => {
-      const base64String = reader.result
-      setImagePreview(base64String)
+      setImagePreview(reader.result)
       setUploading(false)
     }
 
@@ -76,15 +82,24 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
       return
     }
     
-    if (!imagePreview) {
+    if (!imagePreview && !category) {
       alert('Please upload an image')
       return
     }
     
-    onSave(formData)
+    // Create FormData object for multipart/form-data submission
+    const submitData = new FormData()
+    submitData.append('name', formData.name.trim())
+    submitData.append('description', formData.description.trim())
+    
+    // Only append image if a new file was selected
+    if (imageFile) {
+      submitData.append('image', imageFile)
+    }
+    
+    // Pass FormData directly
+    onSave(submitData)
   }
-
-  console.log('Rendering CategoryModal:', {  formData, imagePreview })
 
   if (!isOpen) return null
 
@@ -98,7 +113,7 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto z-10">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-xl font-semibold text-gray-900">
-            {category ? 'Edit Movie ' : 'Add Movie '}
+            {category ? 'Edit Category' : 'Add Category'}
           </h3>
           <button
             onClick={onClose}
@@ -113,14 +128,14 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
             {/* Category Name Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Movie Name *
+                Category Name *
               </label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Enter Movie name (e.g., Action Movies)"
+                placeholder="Enter category name"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                 disabled={loading}
               />
@@ -129,13 +144,13 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
             {/* Category Description Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Movie Description *
+                Category Description *
               </label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Enter Movie description "
+                placeholder="Enter category description"
                 rows="3"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none"
                 disabled={loading}
@@ -145,11 +160,10 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
             {/* Category Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Movie Image *
+                Category Image *
               </label>
               
-              <div className='flex flex-row items-center'>
-                <div className="flex flex-row items-center justify-center w-full">
+              <div className='flex flex-col items-center'>
                 <div className="w-48 h-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
                   {imagePreview ? (
                     <img 
@@ -161,23 +175,22 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
                     <Image className="h-12 w-12 text-gray-400" />
                   )}
                 </div>
-              </div>
 
-              <div className="flex justify-center mt-3">
-                <label className="cursor-pointer">
-                  <div className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    <span>{uploading ? 'Uploading...' : imagePreview ? 'Change Image' : 'Upload Image'}</span>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={uploading || loading}
-                  />
-                </label>
-              </div>
+                <div className="flex justify-center mt-3">
+                  <label className="cursor-pointer">
+                    <div className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      <span>{uploading ? 'Uploading...' : imagePreview ? 'Change Image' : 'Upload Image'}</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploading || loading}
+                    />
+                  </label>
+                </div>
               </div>
               
               <p className="text-xs text-gray-500 text-center mt-2">
@@ -196,7 +209,7 @@ const CategoryModal = ({ isOpen, onClose, onSave, category, loading }) => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || uploading || !imagePreview || !formData.name.trim() || !formData.description.trim()}
+              disabled={loading || uploading || !formData.name.trim() || !formData.description.trim() || (!imagePreview && !category)}
               className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Saving...' : category ? 'Update' : 'Add'}

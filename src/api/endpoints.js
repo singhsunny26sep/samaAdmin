@@ -18,16 +18,16 @@ export const ENDPOINTS = {
   // Categories: {
   CATEGORIES: {
     LIST: '/categories/getAll',
-    CREATE: '/categories',
-    UPDATE: '/categories',
-    DELETE: '/categories',
+    CREATE: '/categories/create',
+    UPDATE: '/categories/update',
+    DELETE: '/categories/delete',
   },
 // Subcategories
   SUBCATEGORIES: {
     LIST: '/subCategories/getAll',
     CREATE: '/subCategories/create', // Backend should handle dynamic categoryId from request body
-    UPDATE: '/subCategories',
-    DELETE: '/subCategories',
+    UPDATE: '/subCategories/update',
+    DELETE: '/subCategories/delete',
     BY_ID: '/subCategories',
     BY_CATEGORY: '/subCategories/category', // Optional: Get subcategories by category
   },
