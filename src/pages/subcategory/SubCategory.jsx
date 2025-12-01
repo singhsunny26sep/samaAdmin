@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Layers,
   Plus,
@@ -17,7 +17,108 @@ import {
 import { getCategories, getSubcategories, createSubcategory, updateSubcategory, deleteSubcategory } from '../../api/api'
 import SubcategoryModal from './SubcategoryModal'
 
-// Main ManageSubcategories Component
+// Utility function to normalize API responses
+const normalizeArray = (response) => {
+  if (Array.isArray(response)) return response
+  if (response?.data) {
+    if (Array.isArray(response.data)) return response.data
+    if (response.data?.data && Array.isArray(response.data.data)) return response.data.data
+  }
+  if (response?.categories && Array.isArray(response.categories)) return response.categories
+  if (response?.subcategories && Array.isArray(response.subcategories)) return response.subcategories
+  return []
+}
+
+// Utility function to get entity ID
+const getId = (entity) => entity?._id || entity?.id
+
+// Stats Card Component
+const StatCard = ({ icon: Icon, label, value }) => (
+  <div className="flex items-center gap-2">
+    <Icon className="h-5 w-5" />
+    <span className="font-semibold">{value} {label}</span>
+  </div>
+)
+
+// Filter Button Component
+const FilterButton = ({ active, onClick, children, gradient, count }) => (
+  <button
+    onClick={onClick}
+    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+      active
+        ? `${gradient} text-white shadow-lg`
+        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+    }`}
+  >
+    {children} ({count})
+  </button>
+)
+
+// Subcategory Card Component
+const SubcategoryCard = ({ subcategory, onEdit, onDelete, onToggleStatus, disabled }) => (
+  <div className="relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-200">
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md overflow-hidden bg-gray-200 flex-shrink-0">
+          {subcategory.image ? (
+            <img src={subcategory.image} alt={subcategory.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-xl font-bold text-gray-600">
+              {subcategory.name.charAt(0)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold text-gray-900 truncate">{subcategory.name}</h3>
+          <p className="text-xs text-blue-600 font-medium truncate">{subcategory.categoryName}</p>
+        </div>
+      </div>
+      
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ml-2 ${
+        subcategory.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+      }`}>
+        {subcategory.isActive ? 'Active' : 'Inactive'}
+      </span>
+    </div>
+
+    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+      {subcategory.description || 'No description available'}
+    </p>
+
+    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+      <span className="text-xs text-gray-500">
+        {subcategory.createdAt ? `Created: ${new Date(subcategory.createdAt).toLocaleDateString()}` : 'No date'}
+      </span>
+      
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onToggleStatus(subcategory)}
+          disabled={disabled}
+          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={subcategory.isActive ? 'Deactivate' : 'Activate'}
+        >
+          {subcategory.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+        </button>
+        <button
+          onClick={() => onEdit(subcategory)}
+          disabled={disabled}
+          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Edit className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => onDelete(subcategory)}
+          disabled={disabled}
+          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+// Main Component
 const ManageSubcategories = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -27,11 +128,10 @@ const ManageSubcategories = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
-
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
 
-  // Fetch categories and all subcategories on component mount
+  // Fetch data on mount
   useEffect(() => {
     fetchCategoriesAndSubcategories()
   }, [])
@@ -41,58 +141,32 @@ const ManageSubcategories = () => {
       setLoading(true)
       setError(null)
       
-      // Fetch categories first
       const categoriesResponse = await getCategories()
+      const allCategories = normalizeArray(categoriesResponse).filter(cat => cat?.image)
+      setCategories(allCategories)
       
-      let allCategories = []
-      if (Array.isArray(categoriesResponse)) {
-        allCategories = categoriesResponse
-      } else if (categoriesResponse.data && Array.isArray(categoriesResponse.data)) {
-        allCategories = categoriesResponse.data
-      } else if (categoriesResponse.data && categoriesResponse.data.data && Array.isArray(categoriesResponse.data.data)) {
-        allCategories = categoriesResponse.data.data
-      } else if (categoriesResponse.categories && Array.isArray(categoriesResponse.categories)) {
-        allCategories = categoriesResponse.categories
-      }
-      
-      const categoriesWithImages = allCategories.filter(cat => cat && cat.image)
-      setCategories(categoriesWithImages)
-      
-      // Fetch subcategories for each category
-      const allSubcategories = []
-      for (const category of categoriesWithImages) {
-        if (category && (category._id || category.id)) {
-          try {
-            const subResponse = await getSubcategories(category._id || category.id)
-            
-            let subs = []
-            if (Array.isArray(subResponse)) {
-              subs = subResponse
-            } else if (subResponse.data && Array.isArray(subResponse.data)) {
-              subs = subResponse.data
-            } else if (subResponse.data && subResponse.data.data && Array.isArray(subResponse.data.data)) {
-              subs = subResponse.data.data
-            } else if (subResponse.subcategories && Array.isArray(subResponse.subcategories)) {
-              subs = subResponse.subcategories
-            }
-            
-            // Add category info to each subcategory
-            subs.forEach(sub => {
-              if (sub && sub.image) {
-                allSubcategories.push({
-                  ...sub,
-                  categoryId: category._id || category.id,
-                  categoryName: category.name
-                })
-              }
-            })
-          } catch (err) {
-            console.error(`Error fetching subcategories for category ${category.name}:`, err)
-          }
+      // Fetch subcategories in parallel
+      const subcategoryPromises = allCategories.map(async (category) => {
+        const categoryId = getId(category)
+        if (!categoryId) return []
+        
+        try {
+          const subResponse = await getSubcategories(categoryId)
+          const subs = normalizeArray(subResponse).filter(sub => sub?.image)
+          
+          return subs.map(sub => ({
+            ...sub,
+            categoryId,
+            categoryName: category.name
+          }))
+        } catch (err) {
+          console.error(`Error fetching subcategories for ${category.name}:`, err)
+          return []
         }
-      }
+      })
       
-      setSubcategories(allSubcategories)
+      const results = await Promise.all(subcategoryPromises)
+      setSubcategories(results.flat())
     } catch (err) {
       console.error('Error fetching data:', err)
       setError(err.response?.data?.message || 'Failed to load data')
@@ -101,98 +175,91 @@ const ManageSubcategories = () => {
     }
   }
 
-  const getCurrentSubcategories = () => {
-    let filtered = subcategories.filter(sub =>
-      sub.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (sub.description && sub.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (sub.categoryName && sub.categoryName.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
+  // Memoized filtered subcategories
+  const filteredSubcategories = useMemo(() => {
+    return subcategories.filter(sub => {
+      const matchesSearch = 
+        sub.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesCategory = categoryFilter === 'all' || sub.categoryId === categoryFilter
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' ? sub.isActive : !sub.isActive)
+      
+      return matchesSearch && matchesCategory && matchesStatus
+    })
+  }, [subcategories, searchTerm, categoryFilter, statusFilter])
 
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(sub => sub.categoryId === categoryFilter)
-    }
+  // Memoized stats
+  const stats = useMemo(() => ({
+    total: subcategories.length,
+    active: subcategories.filter(c => c.isActive).length,
+    inactive: subcategories.filter(c => !c.isActive).length,
+  }), [subcategories])
 
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(sub => 
-        statusFilter === 'active' ? sub.isActive : !sub.isActive
-      )
-    }
-
-    return filtered
-  }
-
-  const handleAddSubcategory = () => {
+  // Handlers
+  const handleAddSubcategory = useCallback(() => {
     setEditingSubcategory(null)
     setIsModalOpen(true)
-  }
+  }, [])
 
-  const handleEditSubcategory = (subcategory) => {
+  const handleEditSubcategory = useCallback((subcategory) => {
     setEditingSubcategory(subcategory)
     setIsModalOpen(true)
-  }
+  }, [])
 
   const handleSaveSubcategory = async (formData) => {
-  try {
-    setActionLoading(true)
-    
-    // FIXED: Remove 'image' field - backend doesn't accept it
-    const subcategoryData = {
-      name: formData.name,
-      description: formData.description,
-      // image: formData.image  // REMOVED - backend rejects this field
-    }
+    try {
+      setActionLoading(true)
+      
+      const subcategoryData = {
+        name: formData.name,
+        description: formData.description,
+      }
 
-    if (editingSubcategory) {
-      // Update existing subcategory
-      await updateSubcategory(
-        formData.categoryId, 
-        editingSubcategory._id || editingSubcategory.id, 
-        subcategoryData
-      )
-      
-      setSubcategories(prev => prev.map(sub =>
-        (sub._id || sub.id) === (editingSubcategory._id || editingSubcategory.id) 
-          ? { ...sub, ...formData } // Keep the image in local state for display
-          : sub
-      ))
-    } else {
-      // Create new subcategory
-      const response = await createSubcategory(formData.categoryId, subcategoryData)
-      const newSubcategory = response.data || response
-      
-      // Find category name
-      const category = categories.find(cat => 
-        (cat._id || cat.id) === formData.categoryId
-      )
-      
-      setSubcategories(prev => [...prev, {
-        ...newSubcategory,
-        image: formData.image, // Add image to local state for display
-        categoryId: formData.categoryId,
-        categoryName: category?.name || 'Unknown'
-      }])
-    }
+      if (editingSubcategory) {
+        await updateSubcategory(
+          formData.categoryId, 
+          getId(editingSubcategory), 
+          subcategoryData
+        )
+        
+        setSubcategories(prev => prev.map(sub =>
+          getId(sub) === getId(editingSubcategory) 
+            ? { ...sub, ...formData }
+            : sub
+        ))
+      } else {
+        const response = await createSubcategory(formData.categoryId, subcategoryData)
+        const newSubcategory = response.data || response
+        const category = categories.find(cat => getId(cat) === formData.categoryId)
+        
+        setSubcategories(prev => [...prev, {
+          ...newSubcategory,
+          image: formData.image,
+          categoryId: formData.categoryId,
+          categoryName: category?.name || 'Unknown'
+        }])
+      }
 
-    setIsModalOpen(false)
-    setEditingSubcategory(null)
-  } catch (err) {
-    console.error('Error saving subcategory:', err)
-    alert(err.response?.data?.message || 'Failed to save subcategory')
-  } finally {
-    setActionLoading(false)
+      setIsModalOpen(false)
+      setEditingSubcategory(null)
+    } catch (err) {
+      console.error('Error saving subcategory:', err)
+      alert(err.response?.data?.message || 'Failed to save subcategory')
+    } finally {
+      setActionLoading(false)
+    }
   }
-}
-
 
   const handleDeleteSubcategory = async (subcategory) => {
-    if (!window.confirm('Are you sure you want to delete this subcategory?')) {
-      return
-    }
+    if (!window.confirm('Are you sure you want to delete this subcategory?')) return
 
     try {
       setActionLoading(true)
-      await deleteSubcategory(subcategory.categoryId, subcategory._id || subcategory.id)
-      setSubcategories(prev => prev.filter(sub => (sub._id || sub.id) !== (subcategory._id || subcategory.id)))
+      await deleteSubcategory(subcategory.categoryId, getId(subcategory))
+      setSubcategories(prev => prev.filter(sub => getId(sub) !== getId(subcategory)))
     } catch (err) {
       console.error('Error deleting subcategory:', err)
       alert(err.response?.data?.message || 'Failed to delete subcategory')
@@ -207,12 +274,13 @@ const ManageSubcategories = () => {
       const updatedData = {
         name: subcategory.name,
         description: subcategory.description,
-        image: subcategory.image
+        image: subcategory.image,
+        isActive: !subcategory.isActive
       }
       
-      await updateSubcategory(subcategory.categoryId, subcategory._id || subcategory.id, updatedData)
+      await updateSubcategory(subcategory.categoryId, getId(subcategory), updatedData)
       setSubcategories(prev => prev.map(sub =>
-        (sub._id || sub.id) === (subcategory._id || subcategory.id) 
+        getId(sub) === getId(subcategory) 
           ? { ...sub, isActive: !sub.isActive } 
           : sub
       ))
@@ -224,7 +292,7 @@ const ManageSubcategories = () => {
     }
   }
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     try {
       const dataStr = JSON.stringify(subcategories, null, 2)
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
@@ -238,18 +306,7 @@ const ManageSubcategories = () => {
       console.error('Error exporting:', err)
       alert('Failed to export subcategories')
     }
-  }
-
-  const getTotalStats = () => {
-    return {
-      total: subcategories.length,
-      active: subcategories.filter(c => c.isActive).length,
-      inactive: subcategories.filter(c => !c.isActive).length,
-    }
-  }
-
-  const stats = getTotalStats()
-  const filteredSubcategories = getCurrentSubcategories()
+  }, [subcategories])
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 space-y-8">
@@ -262,18 +319,9 @@ const ManageSubcategories = () => {
               <h1 className="text-4xl font-bold mb-2">Manage Subcategories</h1>
               <p className="text-white/80 text-lg">Organize your content with detailed subcategories</p>
               <div className="flex items-center gap-6 mt-4">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-5 w-5" />
-                  <span className="font-semibold">{stats.total} Subcategories</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  <span className="font-semibold">{stats.active} Active</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Tag className="h-5 w-5" />
-                  <span className="font-semibold">{categories.length} Categories</span>
-                </div>
+                <StatCard icon={Layers} label="Subcategories" value={stats.total} />
+                <StatCard icon={CheckCircle} label="Active" value={stats.active} />
+                <StatCard icon={Tag} label="Categories" value={categories.length} />
               </div>
             </div>
             
@@ -303,7 +351,6 @@ const ManageSubcategories = () => {
 
       {/* Main Content */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-        {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -320,7 +367,6 @@ const ManageSubcategories = () => {
           </div>
         )}
 
-        {/* Loading State */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
@@ -328,41 +374,34 @@ const ManageSubcategories = () => {
           </div>
         ) : (
           <>
-            {/* Filters and Search */}
+            {/* Filters */}
             <div className="flex flex-col gap-4 mb-6">
-              {/* Status and Category Filters */}
               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button
+                  <FilterButton 
+                    active={statusFilter === 'all'} 
                     onClick={() => setStatusFilter('all')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      statusFilter === 'all'
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    gradient="bg-gradient-to-r from-blue-500 to-indigo-500"
+                    count={subcategories.length}
                   >
-                    All ({subcategories.length})
-                  </button>
-                  <button
+                    All
+                  </FilterButton>
+                  <FilterButton 
+                    active={statusFilter === 'active'} 
                     onClick={() => setStatusFilter('active')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      statusFilter === 'active'
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    gradient="bg-gradient-to-r from-green-500 to-emerald-500"
+                    count={stats.active}
                   >
-                    Active ({subcategories.filter(c => c.isActive).length})
-                  </button>
-                  <button
+                    Active
+                  </FilterButton>
+                  <FilterButton 
+                    active={statusFilter === 'inactive'} 
                     onClick={() => setStatusFilter('inactive')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      statusFilter === 'inactive'
-                        ? 'bg-gradient-to-r from-gray-500 to-slate-500 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    gradient="bg-gradient-to-r from-gray-500 to-slate-500"
+                    count={stats.inactive}
                   >
-                    Inactive ({subcategories.filter(c => !c.isActive).length})
-                  </button>
+                    Inactive
+                  </FilterButton>
                 </div>
 
                 {/* Search */}
@@ -397,7 +436,7 @@ const ManageSubcategories = () => {
                   >
                     <option value="all">All Categories</option>
                     {categories.map(cat => (
-                      <option key={cat._id || cat.id} value={cat._id || cat.id}>
+                      <option key={getId(cat)} value={getId(cat)}>
                         {cat.name}
                       </option>
                     ))}
@@ -415,7 +454,7 @@ const ManageSubcategories = () => {
               </div>
             </div>
 
-            {/* Subcategories Grid */}
+            {/* Grid */}
             {filteredSubcategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Layers className="h-16 w-16 text-gray-300 mb-4" />
@@ -425,75 +464,14 @@ const ManageSubcategories = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredSubcategories.map((subcategory) => (
-                  <div
-                    key={subcategory._id || subcategory.id}
-                    className="relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md overflow-hidden bg-gray-200 flex-shrink-0">
-                          {subcategory.image ? (
-                            <img src={subcategory.image} alt={subcategory.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xl font-bold text-gray-600">
-                              {subcategory.name.charAt(0)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 truncate">{subcategory.name}</h3>
-                          <p className="text-xs text-blue-600 font-medium truncate">{subcategory.categoryName}</p>
-                        </div>
-                      </div>
-                      
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ml-2 ${
-                        subcategory.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {subcategory.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {subcategory.description || 'No description available'}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <span className="text-xs text-gray-500">
-                        {subcategory.createdAt ? `Created: ${new Date(subcategory.createdAt).toLocaleDateString()}` : 'No date'}
-                      </span>
-                      
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleToggleStatus(subcategory)}
-                          disabled={actionLoading}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={subcategory.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {subcategory.isActive ? (
-                            <XCircle className="h-4 w-4" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEditSubcategory(subcategory)}
-                          disabled={actionLoading}
-                          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSubcategory(subcategory)}
-                          disabled={actionLoading}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <SubcategoryCard
+                    key={getId(subcategory)}
+                    subcategory={subcategory}
+                    onEdit={handleEditSubcategory}
+                    onDelete={handleDeleteSubcategory}
+                    onToggleStatus={handleToggleStatus}
+                    disabled={actionLoading}
+                  />
                 ))}
               </div>
             )}

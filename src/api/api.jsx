@@ -4,7 +4,7 @@ import { BASE_URL, ENDPOINTS } from './endpoints'
 // Create axios instance
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json', // FIXED: Changed from multipart/form-data
   },
@@ -231,7 +231,9 @@ export const getAlbumById = async (id) => {
 
 // create Album
 export const createAlbum = async (albumData) => {
-  return await api.post(ENDPOINTS.ALBUMS.CREATE, albumData)
+  return await api.post(ENDPOINTS.ALBUMS.CREATE, albumData , {
+     headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 

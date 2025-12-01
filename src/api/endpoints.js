@@ -59,7 +59,7 @@ export const ENDPOINTS = {
   // ALBUMS ENDPOINTS
   ALBUMS: {
     LIST: '/albums/getAll',           // GET - Get all albums
-    CREATE: '/musics/add',          // POST - Create new album
+    CREATE: '/albums/create',          // POST - Create new album
     UPDATE: '/albums',          // PUT - Update album by ID
     DELETE: '/albums',          // DELETE - Delete album by ID
     BY_ID: '/albums',          // GET - Get single album

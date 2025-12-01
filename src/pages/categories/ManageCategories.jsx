@@ -442,4 +442,4 @@ const ManageCategories = () => {
   )
 }
 
-export default ManageCategories
+export default ManageCategories;
