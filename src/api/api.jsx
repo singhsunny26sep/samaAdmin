@@ -103,6 +103,7 @@ export const updateMusic = async (id, musicData) => {
 export const deleteMusic = async (id) => {
   return await api.delete(`/musics/${id}/delete`)
 }
+
 // ==================== CATEGORY APIs ====================
 export const getCategories = async (params) => {
   return await api.get(ENDPOINTS.CATEGORIES.LIST, { params })

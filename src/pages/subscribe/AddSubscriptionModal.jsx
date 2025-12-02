@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { 
   X,
   Crown,
-  DollarSign,
+  IndianRupee ,
   Calendar,
   Tag,
   Sparkles,
@@ -229,7 +229,7 @@ const AddSubscriptionModal = ({ isOpen, onClose, onSave, editingPlan, loading })
               {/* Price */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-900">
-                  <DollarSign className="inline h-4 w-4 mr-2" />
+                  <IndianRupee className="inline h-4 w-4 mr-2" />
                   Price *
                 </label>
                 <input
