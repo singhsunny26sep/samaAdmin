@@ -11,10 +11,9 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
-  Image as ImageIcon,
-  Folder
+  Image as ImageIcon
 } from 'lucide-react'
-import { uploadMusic, updateMusic, getSubcategories, getAlbums, getCategories } from '../../api/api'
+import {  uploadMusic, updateMusic, getSubcategories, getAlbums } from '../../api/api'
 
 // AddMusic Component
 const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
@@ -23,7 +22,6 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
     artists: [''],
     description: '',
     albumId: '',
-    categoryId: '',
     subCategoryId: ''
   })
   const [imageFile, setImageFile] = useState(null)
@@ -31,9 +29,7 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
   const [imagePreview, setImagePreview] = useState(null)
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState([])
   const [subCategories, setSubCategories] = useState([])
-  const [filteredSubCategories, setFilteredSubCategories] = useState([])
   const [albums, setAlbums] = useState([])
   const [loadingDropdowns, setLoadingDropdowns] = useState(true)
 
@@ -50,7 +46,6 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
         artists: editingMusic.artists || [''],
         description: editingMusic.description || '',
         albumId: editingMusic.albumId || '',
-        categoryId: editingMusic.categoryId || '',
         subCategoryId: editingMusic.subCategoryId || ''
       })
       if (editingMusic.image) {
@@ -61,42 +56,18 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
     }
   }, [editingMusic, isOpen])
 
-  // Filter subcategories when category changes
-  useEffect(() => {
-    if (formData.categoryId) {
-      const filtered = subCategories.filter(
-        sub => sub.categoryId === formData.categoryId || sub.category === formData.categoryId
-      )
-      setFilteredSubCategories(filtered)
-      
-      // Reset subcategory if it doesn't belong to selected category
-      if (formData.subCategoryId) {
-        const isValid = filtered.some(
-          sub => (sub._id || sub.id) === formData.subCategoryId
-        )
-        if (!isValid) {
-          setFormData(prev => ({ ...prev, subCategoryId: '' }))
-        }
-      }
-    } else {
-      setFilteredSubCategories(subCategories)
-    }
-  }, [formData.categoryId, subCategories])
-
   const fetchDropdownData = async () => {
     setLoadingDropdowns(true)
     try {
-      const [categoriesData, subCategoriesData, albumsData] = await Promise.all([
-        getCategories(),
+      const [subCategoriesData, albumsData] = await Promise.all([
         getSubcategories(),
         getAlbums()
       ])
-      setCategories(categoriesData?.data?.data || [])
       setSubCategories(subCategoriesData?.data?.data || [])
       setAlbums(albumsData?.data?.data || [])
     } catch (error) {
       console.error('Error fetching dropdown data:', error)
-      alert('Failed to load categories, subcategories and albums')
+      alert('Failed to load subcategories and albums')
     } finally {
       setLoadingDropdowns(false)
     }
@@ -108,7 +79,6 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
       artists: [''],
       description: '',
       albumId: '',
-      categoryId: '',
       subCategoryId: ''
     })
     setImageFile(null)
@@ -195,7 +165,7 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!formData.title || !formData.artists[0] || !formData.albumId || !formData.categoryId || !formData.subCategoryId) {
+    if (!formData.title || !formData.artists[0] || !formData.albumId || !formData.subCategoryId) {
       alert('Please fill in all required fields')
       return
     }
@@ -218,7 +188,6 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
       
       submitFormData.append('description', formData.description)
       submitFormData.append('albumId', formData.albumId)
-      submitFormData.append('categoryId', formData.categoryId)
       submitFormData.append('subCategoryId', formData.subCategoryId)
       
       if (imageFile) {
@@ -455,60 +424,29 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Category Dropdown */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-900">
-                  <Folder className="inline h-4 w-4 mr-2" />
-                  Category *
-                </label>
-                <select
-                  name="categoryId"
-                  value={formData.categoryId}
-                  onChange={handleChange}
-                  disabled={loadingDropdowns}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                  required
-                >
-                  <option value="">
-                    {loadingDropdowns ? 'Loading categories...' : 'Select a category'}
+            {/* SubCategory Dropdown */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-900">
+                <Tag className="inline h-4 w-4 mr-2" />
+                SubCategory *
+              </label>
+              <select
+                name="subCategoryId"
+                value={formData.subCategoryId}
+                onChange={handleChange}
+                disabled={loadingDropdowns}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
+                required
+              >
+                <option value="">
+                  {loadingDropdowns ? 'Loading subcategories...' : 'Select a subcategory'}
+                </option>
+                {subCategories.map((subCategory) => (
+                  <option key={subCategory._id || subCategory.id} value={subCategory._id || subCategory.id}>
+                    {subCategory.name || subCategory.title}
                   </option>
-                  {categories.map((category) => (
-                    <option key={category._id || category.id} value={category._id || category.id}>
-                      {category.name || category.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* SubCategory Dropdown */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-900">
-                  <Tag className="inline h-4 w-4 mr-2" />
-                  SubCategory *
-                </label>
-                <select
-                  name="subCategoryId"
-                  value={formData.subCategoryId}
-                  onChange={handleChange}
-                  disabled={loadingDropdowns || !formData.categoryId}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                  required
-                >
-                  <option value="">
-                    {loadingDropdowns 
-                      ? 'Loading subcategories...' 
-                      : !formData.categoryId 
-                      ? 'Select category first' 
-                      : 'Select a subcategory'}
-                  </option>
-                  {filteredSubCategories.map((subCategory) => (
-                    <option key={subCategory._id || subCategory.id} value={subCategory._id || subCategory.id}>
-                      {subCategory.name || subCategory.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                ))}
+              </select>
             </div>
 
             {/* Description */}
@@ -562,3 +500,4 @@ const AddMusic = ({ isOpen, onClose, onAddMusic, editingMusic }) => {
 }
 
 export default AddMusic
+
