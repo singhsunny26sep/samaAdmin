@@ -6,26 +6,34 @@ import {
 } from 'lucide-react'
 
 
-// SubcategoryModal Component
-const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categories, selectedCategory }) => {
+// SubcategoryModal Component - FIXED VERSION
+const SubcategoryModal = ({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  editingSubcategory,  // Changed from 'subcategory' to 'editingSubcategory'
+  loading, 
+  categories, 
+  selectedCategory 
+}) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     categoryId: ''
   })
   const [imagePreview, setImagePreview] = useState('')
-  const [imageFile, setImageFile] = useState(null) // Store actual file
+  const [imageFile, setImageFile] = useState(null)
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    if (subcategory) {
+    if (editingSubcategory) {  // Changed from 'subcategory'
       setFormData({
-        name: subcategory.name || '',
-        description: subcategory.description || '',
-        categoryId: subcategory.categoryId || selectedCategory || ''
+        name: editingSubcategory.name || '',
+        description: editingSubcategory.description || '',
+        categoryId: editingSubcategory.categoryId || selectedCategory || ''
       })
-      setImagePreview(subcategory.image || '')
-      setImageFile(null) // Clear file when editing
+      setImagePreview(editingSubcategory.image || '')
+      setImageFile(null)
     } else {
       setFormData({
         name: '',
@@ -35,7 +43,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
       setImagePreview('')
       setImageFile(null)
     }
-  }, [subcategory, isOpen, selectedCategory])
+  }, [editingSubcategory, isOpen, selectedCategory])  // Changed dependency
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
@@ -52,11 +60,8 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
     }
 
     setUploading(true)
-
-    // Store the actual file
     setImageFile(file)
 
-    // Create preview
     const reader = new FileReader()
     
     reader.onloadend = () => {
@@ -97,16 +102,15 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
     }
     
     // For new subcategory, require file
-    if (!subcategory && !imageFile) {
+    if (!editingSubcategory && !imageFile) {  // Changed from 'subcategory'
       alert('Please upload an image')
       return
     }
     
-    // Pass the file object, not base64
     onSave({ 
       ...formData, 
-      imageFile: imageFile, // Pass actual file
-      image: imagePreview // Keep preview for display
+      imageFile: imageFile,
+      image: imagePreview
     })
   }
 
@@ -122,7 +126,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto z-10">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-xl font-semibold text-gray-900">
-            {subcategory ? 'Edit Subcategory' : 'Add Subcategory'}
+            {editingSubcategory ? 'Edit Subcategory' : 'Add Subcategory'}
           </h3>
           <button
             onClick={onClose}
@@ -145,7 +149,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
                   value={formData.categoryId}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition appearance-none bg-white"
-                  disabled={loading || !!subcategory}
+                  disabled={loading || !!editingSubcategory}  // Changed
                 >
                   <option value="">Select a category</option>
                   {categories.map(cat => (
@@ -156,7 +160,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
-              {subcategory && (
+              {editingSubcategory && (  // Changed
                 <p className="text-xs text-gray-500 mt-1">Category cannot be changed when editing</p>
               )}
             </div>
@@ -193,7 +197,7 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subcategory Image {!subcategory && '*'}
+                Subcategory Image {!editingSubcategory && '*'}
               </label>
               
               <div className='flex flex-col items-center gap-4'>
@@ -239,10 +243,10 @@ const SubcategoryModal = ({ isOpen, onClose, onSave, subcategory, loading, categ
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || uploading || !formData.name.trim() || !formData.description.trim() || !formData.categoryId || (!subcategory && !imageFile)}
+              disabled={loading || uploading || !formData.name.trim() || !formData.description.trim() || !formData.categoryId || (!editingSubcategory && !imageFile)}
               className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Saving...' : subcategory ? 'Update' : 'Add'}
+              {loading ? 'Saving...' : editingSubcategory ? 'Update' : 'Add'}
             </button>
           </div>
         </div>

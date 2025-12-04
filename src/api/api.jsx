@@ -152,7 +152,9 @@ export const createSubcategory = async (categoryId, subcategoryData) => {
 }
 
 export const updateSubcategory = async (categoryId, subcategoryId, subcategoryData) => {
-  return await api.put(`${ENDPOINTS.SUBCATEGORIES.UPDATE}/${subcategoryId}`, subcategoryData)
+  return await api.put(`${ENDPOINTS.SUBCATEGORIES.UPDATE}/${subcategoryId}`, subcategoryData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export const deleteSubcategory = async (categoryId, subcategoryId) => {
