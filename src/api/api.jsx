@@ -248,7 +248,11 @@ export const createAlbum = async (albumData) => {
 // update Album
 
 export const updateAlbum = async (id, albumData) => {
-  return await api.put(`${ENDPOINTS.ALBUMS.UPDATE}/${id}`, albumData)
+  return await api.put(`${ENDPOINTS.ALBUMS.UPDATE}/${id}`, albumData,
+     {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }
+  )
 }
 
 // delete Album
