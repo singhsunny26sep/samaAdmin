@@ -8,7 +8,9 @@ import {
   Music,
   X,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { getMusic, deleteMusic } from '../../api/api'
 import AddMusic from './AddMusic'
@@ -16,37 +18,52 @@ import AddMusic from './AddMusic'
 const MusicList = () => {
   const [musicList, setMusicList] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [filteredMusic, setFilteredMusic] = useState([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingMusic, setEditingMusic] = useState(null)
   const [selectedTracks, setSelectedTracks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Pagination state from API
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
     fetchMusicList()
-  }, [])
+  }, [currentPage, itemsPerPage])
 
   const fetchMusicList = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await getMusic()
       
-      // Handle different response structures
+      // Pass page and limit to API
+      const response = await getMusic({ page: currentPage, limit: itemsPerPage })
+      
+      // Handle the API response structure
       let music = []
-      if (Array.isArray(response)) {
-        music = response
-      } else if (response.data?.data && Array.isArray(response.data.data)) {
-        music = response.data.data
-      } else if (response.data && Array.isArray(response.data)) {
+      let pagination = {}
+      
+      if (response.data?.data) {
+        // Structure from your API
+        music = Array.isArray(response.data.data) ? response.data.data : []
+        pagination = {
+          total: response.data.total || 0,
+          totalPages: response.data.totalPages || 0,
+          page: response.data.page || 1,
+          limit: response.data.limit || 10
+        }
+      } else if (Array.isArray(response.data)) {
         music = response.data
-      } else if (response.music && Array.isArray(response.music)) {
-        music = response.music
+      } else if (Array.isArray(response)) {
+        music = response
       }
       
       setMusicList(music)
-      setFilteredMusic(music)
+      setTotalItems(pagination.total || music.length)
+      setTotalPages(pagination.totalPages || Math.ceil(music.length / itemsPerPage))
     } catch (err) {
       console.error('Error fetching music:', err)
       setError(err.response?.data?.message || err.message || 'Failed to load music')
@@ -55,18 +72,33 @@ const MusicList = () => {
     }
   }
 
-  useEffect(() => {
-    const filtered = musicList.filter(music => {
-      const searchLower = searchTerm.toLowerCase()
-      return (
-        music.name?.toLowerCase().includes(searchLower) ||
-        music.title?.toLowerCase().includes(searchLower) ||
-        music.description?.toLowerCase().includes(searchLower) ||
-        music.artists?.some(artist => artist.toLowerCase().includes(searchLower))
-      )
-    })
-    setFilteredMusic(filtered)
-  }, [searchTerm, musicList])
+  // Client-side search filtering
+  const filteredMusic = musicList.filter(music => {
+    if (!searchTerm) return true
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      music.name?.toLowerCase().includes(searchLower) ||
+      music.title?.toLowerCase().includes(searchLower) ||
+      music.description?.toLowerCase().includes(searchLower) ||
+      music.artists?.some(artist => artist.toLowerCase().includes(searchLower)) ||
+      music.category?.name?.toLowerCase().includes(searchLower) ||
+      music.subCategory?.name?.toLowerCase().includes(searchLower) ||
+      music.album?.name?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      setSelectedTracks([]) // Clear selections when changing page
+    }
+  }
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setItemsPerPage(newLimit)
+    setCurrentPage(1) // Reset to first page
+    setSelectedTracks([])
+  }
 
   const handleEdit = (music) => {
     setEditingMusic(music)
@@ -114,6 +146,10 @@ const MusicList = () => {
     }
   }
 
+  // Calculate display info
+  const startIndex = (currentPage - 1) * itemsPerPage + 1
+  const endIndex = Math.min(currentPage * itemsPerPage, totalItems)
+
   return (
     <div className="space-y-8 p-6 bg-gray-50 min-h-screen">
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-8 text-white">
@@ -126,7 +162,7 @@ const MusicList = () => {
               <div className="flex items-center gap-6 mt-4">
                 <div className="flex items-center gap-2">
                   <Music className="h-5 w-5" />
-                  <span className="font-semibold">{musicList.length} Tracks</span>
+                  <span className="font-semibold">{totalItems} Tracks</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">
@@ -183,12 +219,12 @@ const MusicList = () => {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 gap-4">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search tracks, albums, descriptions..."
+                  placeholder="Search tracks, artists, albums..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-10 py-2.5 w-full bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
@@ -201,6 +237,20 @@ const MusicList = () => {
                     <X className="h-4 w-4" />
                   </button>
                 )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
             </div>
 
@@ -253,7 +303,10 @@ const MusicList = () => {
                         Category
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Description
+                        Album
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Duration
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Status
@@ -281,13 +334,13 @@ const MusicList = () => {
                               {music.image ? (
                                 <img 
                                   src={music.image} 
-                                  alt={music.name || music.title}
+                                  alt={music.title || music.name}
                                   className="h-12 w-12 rounded-xl object-cover shadow-lg"
                                 />
                               ) : (
                                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
                                   <span className="text-lg font-bold text-white">
-                                    {(music.name || music.title)?.charAt(0) || 'M'}
+                                    {(music.title || music.name)?.charAt(0) || 'M'}
                                   </span>
                                 </div>
                               )}
@@ -295,24 +348,39 @@ const MusicList = () => {
                             
                             <div>
                               <h3 className="text-sm font-semibold text-gray-900">
-                                {music.name || music.title}
+                                {music.title || music.name}
                               </h3>
-                              <p className="text-xs text-gray-400">
-                                {new Date(music.createdAt).toLocaleDateString()}
+                              <p className="text-xs text-gray-500">
+                                {music.artists?.join(', ') || 'Unknown Artist'}
                               </p>
                             </div>
                           </div>
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                            {music.categoryId?.substring(0, 8) || 'No Category'}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 w-fit">
+                              {music.category?.name || 'No Category'}
+                            </span>
+                            {music.subCategory && (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 w-fit">
+                                {music.subCategory.name}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-gray-600 max-w-xs truncate">
-                            {music.description || 'No description'}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-600">
+                            {music.album?.name || 'No Album'}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-600">
+                            {music.durationInSeconds 
+                              ? `${Math.floor(music.durationInSeconds / 60)}:${(music.durationInSeconds % 60).toString().padStart(2, '0')}`
+                              : '-'}
                           </p>
                         </td>
 
@@ -350,6 +418,73 @@ const MusicList = () => {
                 </table>
               </div>
             </div>
+
+            {/* Pagination Controls */}
+            {totalItems > 0 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-200 pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>
+                    Showing <span className="font-semibold text-gray-900">{startIndex}</span> to{' '}
+                    <span className="font-semibold text-gray-900">{endIndex}</span> of{' '}
+                    <span className="font-semibold text-gray-900">{totalItems}</span> results
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage =
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+
+                      if (!showPage) {
+                        // Show ellipsis
+                        if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <span key={page} className="px-2 text-gray-400">
+                              ...
+                            </span>
+                          )
+                        }
+                        return null
+                      }
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {filteredMusic.length === 0 && !loading && (
               <div className="text-center py-12">
