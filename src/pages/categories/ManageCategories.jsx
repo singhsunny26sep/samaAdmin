@@ -14,6 +14,8 @@ import {
   XCircle,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import CategoryModal from './CategoryModal'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api/api'
@@ -29,27 +31,43 @@ const ManageCategories = () => {
   const [actionLoading, setActionLoading] = useState(false)
 
   const [categories, setCategories] = useState([])
+  
+  // Pagination state from API
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
-  // Fetch ALL categories on component mount
+  // Fetch categories when page or limit changes
   useEffect(() => {
     fetchCategories()
-  }, [])
+  }, [currentPage, itemsPerPage])
 
   const fetchCategories = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await getCategories()
-      // Handle different response structures
+      
+      // Pass page and limit to API
+      const response = await getCategories({ page: currentPage, limit: itemsPerPage })
+      
+      // Handle the API response structure
       let allCategories = []
-      if (Array.isArray(response)) {
-        allCategories = response
-      } else if (response.data && Array.isArray(response.data)) {
+      let pagination = {}
+      
+      if (response.data?.data) {
+        // Structure from your API
+        allCategories = Array.isArray(response.data.data) ? response.data.data : []
+        pagination = {
+          total: response.data.total || 0,
+          totalPages: response.data.totalPages || 0,
+          page: response.data.page || 1,
+          limit: response.data.limit || 10
+        }
+      } else if (Array.isArray(response.data)) {
         allCategories = response.data
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        allCategories = response.data.data
-      } else if (response.categories && Array.isArray(response.categories)) {
-        allCategories = response.categories
+      } else if (Array.isArray(response)) {
+        allCategories = response
       }
       
       console.log('Fetched categories:', allCategories)
@@ -58,6 +76,8 @@ const ManageCategories = () => {
       const categoriesWithImages = allCategories.filter(cat => cat && cat.image)
       
       setCategories(categoriesWithImages)
+      setTotalItems(pagination.total || categoriesWithImages.length)
+      setTotalPages(pagination.totalPages || Math.ceil(categoriesWithImages.length / itemsPerPage))
     } catch (err) {
       console.error('Error fetching categories:', err)
       setError(err.response?.data?.message || 'Failed to load categories')
@@ -81,6 +101,17 @@ const ManageCategories = () => {
     return filtered
   }
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setItemsPerPage(newLimit)
+    setCurrentPage(1) // Reset to first page
+  }
+
   const handleAddCategory = () => {
     setEditingCategory(null)
     setIsModalOpen(true)
@@ -91,13 +122,9 @@ const ManageCategories = () => {
     setIsModalOpen(true)
   }
 
-  // FIXED: Now accepts FormData directly from the modal
   const handleSaveCategory = async (formData) => {
     try {
       setActionLoading(true)
-      
-      // formData is already a FormData object with name, description, and image
-      // Just pass it directly to the API
       
       if (editingCategory) {
         // Update existing category
@@ -141,7 +168,7 @@ const ManageCategories = () => {
     try {
       setActionLoading(true)
       await deleteCategory(id)
-      setCategories(prev => prev.filter(cat => (cat._id || cat.id) !== id))
+      await fetchCategories()
     } catch (err) {
       console.error('Error deleting category:', err)
       alert(err.response?.data?.message || 'Failed to delete category')
@@ -191,7 +218,7 @@ const ManageCategories = () => {
 
   const getTotalStats = () => {
     return {
-      total: categories.length,
+      total: totalItems,
       active: categories.filter(c => c.isActive).length,
       inactive: categories.filter(c => !c.isActive).length,
     }
@@ -199,6 +226,10 @@ const ManageCategories = () => {
 
   const stats = getTotalStats()
   const filteredCategories = getCurrentCategories()
+
+  // Calculate display info
+  const startIndex = (currentPage - 1) * itemsPerPage + 1
+  const endIndex = Math.min(currentPage * itemsPerPage, totalItems)
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 space-y-8">
@@ -308,23 +339,39 @@ const ManageCategories = () => {
                 </button>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search categories..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-10 py-2.5 w-80 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search categories..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-10 py-2.5 w-64 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Show:</label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+                    <option value={6}>6</option>
+                    <option value={9}>9</option>
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -401,6 +448,73 @@ const ManageCategories = () => {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Controls */}
+            {totalItems > 0 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-200 pt-6">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>
+                    Showing <span className="font-semibold text-gray-900">{startIndex}</span> to{' '}
+                    <span className="font-semibold text-gray-900">{endIndex}</span> of{' '}
+                    <span className="font-semibold text-gray-900">{totalItems}</span> categories
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage =
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+
+                      if (!showPage) {
+                        // Show ellipsis
+                        if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <span key={page} className="px-2 text-gray-400">
+                              ...
+                            </span>
+                          )
+                        }
+                        return null
+                      }
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Empty State */}
             {filteredCategories.length === 0 && !loading && (

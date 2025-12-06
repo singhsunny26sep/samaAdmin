@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Upload, X, Save, Image, Music, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Upload, X, Save, Image, Music, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAlbums, createAlbum, updateAlbum, deleteAlbum } from '../../api/api';
 
 // AlbumForm Component
@@ -241,6 +241,96 @@ const AlbumForm = ({ album, onClose, onSubmit }) => {
   );
 };
 
+// Pagination Component
+const Pagination = ({ currentPage, totalPages, onPageChange, itemsPerPage, totalItems, onItemsPerPageChange }) => {
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-6 border-t border-gray-200">
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <span>Show</span>
+        <select
+          value={itemsPerPage}
+          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        >
+          <option value={6}>6</option>
+          <option value={9}>9</option>
+          <option value={12}>12</option>
+          <option value={18}>18</option>
+          <option value={24}>24</option>
+        </select>
+        <span>of {totalItems} albums</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft size={18} />
+        </button>
+
+        {getPageNumbers().map((page, index) => (
+          page === '...' ? (
+            <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">
+              ...
+            </span>
+          ) : (
+            <button
+              key={page}
+              onClick={() => onPageChange(page)}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                currentPage === page
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          )
+        ))}
+
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // AlbumManagement Component
 const AlbumManagement = () => {
   const [albums, setAlbums] = useState([]);
@@ -248,6 +338,10 @@ const AlbumManagement = () => {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const fetchAlbums = async () => {
     setLoading(true);
@@ -273,6 +367,22 @@ const AlbumManagement = () => {
     fetchAlbums();
   }, []);
 
+  // Calculate pagination
+  const totalPages = Math.ceil(albums.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentAlbums = albums.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
   const handleAddAlbum = () => {
     setSelectedAlbum(null);
     setShowForm(true);
@@ -291,6 +401,12 @@ const AlbumManagement = () => {
     try {
       await deleteAlbum(albumId);
       await fetchAlbums();
+      
+      // Adjust current page if needed after deletion
+      const newTotalPages = Math.ceil((albums.length - 1) / itemsPerPage);
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      }
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to delete album');
       console.error('Error deleting album:', err);
@@ -375,62 +491,75 @@ const AlbumManagement = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {albums.map((album) => (
-              <div
-                key={album._id || album.id}
-                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 hover:border-purple-300"
-              >
-                <div className="relative h-56 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
-                  {(album.imageUrl || album.image) ? (
-                    <img
-                      src={album.imageUrl || album.image}
-                      alt={album.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Image className="w-20 h-20 text-purple-400" />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {currentAlbums.map((album) => (
+                <div
+                  key={album._id || album.id}
+                  className="group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 hover:border-purple-300"
+                >
+                  <div className="relative h-56 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+                    {(album.imageUrl || album.image) ? (
+                      <img
+                        src={album.imageUrl || album.image}
+                        alt={album.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Image className="w-20 h-20 text-purple-400" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute top-3 right-3">
+                      <span className={`px-3 py-1 text-xs font-semibold rounded-full shadow-lg ${
+                        album.isActive 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-gray-500 text-white'
+                      }`}>
+                        {album.isActive ? 'Active' : 'Inactive'}
+                      </span>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full shadow-lg ${
-                      album.isActive 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-gray-500 text-white'
-                    }`}>
-                      {album.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1 truncate">
+                      {album.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[2.5rem]">
+                      {album.description}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditAlbum(album)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-purple-400 transition-colors font-medium"
+                      >
+                        <Edit2 size={16} />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAlbum(album._id || album.id)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-medium shadow-md"
+                      >
+                        <Trash2 size={16} />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1 truncate">
-                    {album.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[2.5rem]">
-                    {album.description}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditAlbum(album)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-purple-400 transition-colors font-medium"
-                    >
-                      <Edit2 size={16} />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAlbum(album._id || album.id)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-medium shadow-md"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                itemsPerPage={itemsPerPage}
+                totalItems={albums.length}
+                onItemsPerPageChange={handleItemsPerPageChange}
+              />
+            )}
+          </>
         )}
       </div>
 

@@ -11,6 +11,8 @@ import {
   CheckCircle,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { getCategories, getSubcategories, createSubcategory, updateSubcategory, deleteSubcategory } from '../../api/api'
 import SubcategoryModal from './SubcategoryModal'
@@ -25,16 +27,23 @@ const ManageSubcategories = () => {
 
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(12)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
     fetchCategoriesAndSubcategories()
-  }, [])
+  }, [currentPage, itemsPerPage])
 
   const fetchCategoriesAndSubcategories = async () => {
     try {
       setLoading(true)
       setError(null)
       
+      // Fetch categories (might need pagination too if you have many)
       const categoriesResponse = await getCategories()
       
       let allCategories = []
@@ -51,21 +60,37 @@ const ManageSubcategories = () => {
       const categoriesWithImages = allCategories.filter(cat => cat && cat.image)
       setCategories(categoriesWithImages)
       
+      // Fetch subcategories with pagination
       const allSubcategories = []
-      const seenSubcategoryIds = new Set() // Track unique subcategories
+      const seenSubcategoryIds = new Set()
+      let totalCount = 0
       
       for (const category of categoriesWithImages) {
         if (category && (category._id || category.id)) {
           try {
-            const subResponse = await getSubcategories(category._id || category.id)
+            // Pass pagination parameters to getSubcategories
+            const subResponse = await getSubcategories(
+              category._id || category.id,
+              { page: currentPage, limit: itemsPerPage }
+            )
             
             let subs = []
-            if (Array.isArray(subResponse)) {
+            let pagination = {}
+            
+            if (subResponse.data?.data) {
+              // API response with pagination
+              subs = Array.isArray(subResponse.data.data) ? subResponse.data.data : []
+              pagination = {
+                total: subResponse.data.total || 0,
+                totalPages: subResponse.data.totalPages || 0,
+                page: subResponse.data.page || 1,
+                limit: subResponse.data.limit || 12
+              }
+              totalCount += pagination.total
+            } else if (Array.isArray(subResponse)) {
               subs = subResponse
             } else if (subResponse.data && Array.isArray(subResponse.data)) {
               subs = subResponse.data
-            } else if (subResponse.data && subResponse.data.data && Array.isArray(subResponse.data.data)) {
-              subs = subResponse.data.data
             } else if (subResponse.subcategories && Array.isArray(subResponse.subcategories)) {
               subs = subResponse.subcategories
             }
@@ -73,7 +98,6 @@ const ManageSubcategories = () => {
             subs.forEach(sub => {
               if (sub && sub.image) {
                 const subId = sub._id || sub.id
-                // Only add if we haven't seen this subcategory before
                 if (!seenSubcategoryIds.has(subId)) {
                   seenSubcategoryIds.add(subId)
                   allSubcategories.push({
@@ -91,6 +115,8 @@ const ManageSubcategories = () => {
       }
       
       setSubcategories(allSubcategories)
+      setTotalItems(totalCount || allSubcategories.length)
+      setTotalPages(Math.ceil((totalCount || allSubcategories.length) / itemsPerPage))
     } catch (err) {
       console.error('Error fetching data:', err)
       setError(err.response?.data?.message || 'Failed to load data')
@@ -104,6 +130,17 @@ const ManageSubcategories = () => {
     (sub.description && sub.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (sub.categoryName && sub.categoryName.toLowerCase().includes(searchTerm.toLowerCase()))
   )
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setItemsPerPage(newLimit)
+    setCurrentPage(1)
+  }
 
   const handleAddSubcategory = () => {
     setEditingSubcategory(null)
@@ -119,12 +156,10 @@ const ManageSubcategories = () => {
     try {
       setActionLoading(true)
       
-      // Create FormData for file upload
       const submitData = new FormData()
       submitData.append('name', formData.name)
       submitData.append('description', formData.description)
       
-      // Only append image file if it exists (new upload)
       if (formData.imageFile) {
         submitData.append('image', formData.imageFile)
       }
@@ -158,6 +193,7 @@ const ManageSubcategories = () => {
 
       setIsModalOpen(false)
       setEditingSubcategory(null)
+      await fetchCategoriesAndSubcategories()
     } catch (err) {
       console.error('Error saving subcategory:', err)
       alert(err.response?.data?.message || 'Failed to save subcategory')
@@ -174,7 +210,7 @@ const ManageSubcategories = () => {
     try {
       setActionLoading(true)
       await deleteSubcategory(subcategory.categoryId, subcategory._id || subcategory.id)
-      setSubcategories(prev => prev.filter(sub => (sub._id || sub.id) !== (subcategory._id || subcategory.id)))
+      await fetchCategoriesAndSubcategories()
     } catch (err) {
       console.error('Error deleting subcategory:', err)
       alert(err.response?.data?.message || 'Failed to delete subcategory')
@@ -200,6 +236,8 @@ const ManageSubcategories = () => {
   }
 
   const activeCount = subcategories.filter(c => c.isActive).length
+  const startIndex = (currentPage - 1) * itemsPerPage + 1
+  const endIndex = Math.min(currentPage * itemsPerPage, totalItems)
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 space-y-8">
@@ -214,7 +252,7 @@ const ManageSubcategories = () => {
               <div className="flex items-center gap-6 mt-4">
                 <div className="flex items-center gap-2">
                   <Layers className="h-5 w-5" />
-                  <span className="font-semibold">{subcategories.length} Subcategories</span>
+                  <span className="font-semibold">{totalItems} Subcategories</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5" />
@@ -278,8 +316,8 @@ const ManageSubcategories = () => {
           </div>
         ) : (
           <>
-            {/* Search */}
-            <div className="mb-6 flex justify-end">
+            {/* Search and Items Per Page */}
+            <div className="mb-6 flex flex-col sm:flex-row justify-between gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -287,7 +325,7 @@ const ManageSubcategories = () => {
                   placeholder="Search subcategories..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-10 py-2.5 w-80 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-10 pr-10 py-2.5 w-full sm:w-80 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {searchTerm && (
                   <button
@@ -298,6 +336,20 @@ const ManageSubcategories = () => {
                   </button>
                 )}
               </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+              </div>
             </div>
 
             {/* Subcategories Grid */}
@@ -305,70 +357,151 @@ const ManageSubcategories = () => {
               <div className="flex flex-col items-center justify-center py-20">
                 <Layers className="h-16 w-16 text-gray-300 mb-4" />
                 <p className="text-gray-500 font-medium text-lg">No subcategories found</p>
-                <p className="text-gray-400 text-sm mt-1">Try adjusting your search or add a new subcategory</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  {searchTerm 
+                    ? 'Try adjusting your search or add a new subcategory'
+                    : 'Get started by creating your first subcategory'}
+                </p>
+                {!searchTerm && (
+                  <button 
+                    onClick={handleAddSubcategory}
+                    disabled={actionLoading}
+                    className="mt-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Subcategory
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredSubcategories.map((subcategory) => (
-                  <div
-                    key={subcategory._id || subcategory.id}
-                    className="relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md overflow-hidden bg-gray-200 flex-shrink-0">
-                          {subcategory.image ? (
-                            <img src={subcategory.image} alt={subcategory.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xl font-bold text-gray-600">
-                              {subcategory.name.charAt(0)}
-                            </span>
-                          )}
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredSubcategories.map((subcategory) => (
+                    <div
+                      key={subcategory._id || subcategory.id}
+                      className="relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-200"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md overflow-hidden bg-gray-200 flex-shrink-0">
+                            {subcategory.image ? (
+                              <img src={subcategory.image} alt={subcategory.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xl font-bold text-gray-600">
+                                {subcategory.name.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 truncate">{subcategory.name}</h3>
+                            <p className="text-xs text-blue-600 font-medium truncate">{subcategory.categoryName}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 truncate">{subcategory.name}</h3>
-                          <p className="text-xs text-blue-600 font-medium truncate">{subcategory.categoryName}</p>
+                        
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ml-2 ${
+                          subcategory.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {subcategory.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {subcategory.description || 'No description available'}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                        <span className="text-xs text-gray-500">
+                          {subcategory.createdAt ? `Created: ${new Date(subcategory.createdAt).toLocaleDateString()}` : 'No date'}
+                        </span>
+                        
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditSubcategory(subcategory)}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSubcategory(subcategory)}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                      
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ml-2 ${
-                        subcategory.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {subcategory.isActive ? 'Active' : 'Inactive'}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalItems > 0 && (
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-200 pt-6">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>
+                        Showing <span className="font-semibold text-gray-900">{startIndex}</span> to{' '}
+                        <span className="font-semibold text-gray-900">{endIndex}</span> of{' '}
+                        <span className="font-semibold text-gray-900">{totalItems}</span> subcategories
                       </span>
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {subcategory.description || 'No description available'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <span className="text-xs text-gray-500">
-                        {subcategory.createdAt ? `Created: ${new Date(subcategory.createdAt).toLocaleDateString()}` : 'No date'}
-                      </span>
-                      
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleEditSubcategory(subcategory)}
-                          disabled={actionLoading}
-                          className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSubcategory(subcategory)}
-                          disabled={actionLoading}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                          const showPage =
+                            page === 1 ||
+                            page === totalPages ||
+                            (page >= currentPage - 1 && page <= currentPage + 1)
+
+                          if (!showPage) {
+                            if (page === currentPage - 2 || page === currentPage + 2) {
+                              return (
+                                <span key={page} className="px-2 text-gray-400">
+                                  ...
+                                </span>
+                              )
+                            }
+                            return null
+                          }
+
+                          return (
+                            <button
+                              key={page}
+                              onClick={() => handlePageChange(page)}
+                              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                currentPage === page
+                                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+                                  : 'text-gray-700 hover:bg-gray-100'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          )
+                        })}
                       </div>
+
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </>
         )}
