@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { 
   CreditCard, 
   Calendar, 
-  DollarSign, 
+  IndianRupee, 
   TrendingUp, 
   Users, 
   Plus,
@@ -227,7 +227,7 @@ const fetchSubscriptionPlans = async () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
+                  <IndianRupee className="h-5 w-5" />
                   <span className="font-semibold">
                     ₹{getTotalRevenue().toLocaleString()}/year
                   </span>

@@ -4,7 +4,6 @@ import { BASE_URL, ENDPOINTS } from './endpoints'
 // Create axios instance
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 20000,
   headers: {
     'Content-Type': 'application/json', // FIXED: Changed from multipart/form-data
   },
