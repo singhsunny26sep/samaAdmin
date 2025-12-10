@@ -1,5 +1,5 @@
-// export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.samasong.com/sama-music'
-export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://samamusic.onrender.com/sama-music'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.samasong.com/sama-music'
+// export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://samamusic.onrender.com/sama-music'
 
 export const ENDPOINTS = {
   AUTH: {
