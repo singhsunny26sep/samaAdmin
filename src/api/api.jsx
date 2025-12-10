@@ -4,7 +4,7 @@ import { BASE_URL, ENDPOINTS } from './endpoints'
 // Create axios instance
 const api = axios.create({
   baseURL: BASE_URL,
-  withCredentials: true,
+  // withCredentials: true,
   headers: {
     "Content-Type": "application/json"
   }
